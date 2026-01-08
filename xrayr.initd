@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+name="XrayR"
+description="XrayR Service"
+command="/usr/local/XrayR/XrayR"
+command_args="--config /etc/XrayR/config.yml"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/xrayr.log"
+error_log="/var/log/xrayr.err"
+
+depend() {
+    need net
+    after firewall
+}

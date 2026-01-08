@@ -9,110 +9,147 @@ Find the source code here: [XrayR-project/XrayR](https://github.com/XrayR-projec
 
 [教程](https://xrayr-project.github.io/XrayR-doc/)
 
-# 一键安装
+# 快速部署
 
-```
-bash <(curl -Ls https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/install.sh)
-```
-# Docker 安装
+## 支持的系统
 
-```
-docker pull ghcr.io/xrayr-project/xrayr:latest && docker run --restart=always --name xrayr -d -v ${PATH_TO_CONFIG}/config.yml:/etc/XrayR/config.yml --network=host ghcr.io/xrayr-project/xrayr:latest
+- Ubuntu 16+
+- Debian 8+
+- CentOS 7+
+- Alpine Linux 3+
+
+## 部署方式
+
+### 方式一：交互式安装（推荐新手）
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/install.sh)
 ```
 
-# Docker compose 安装
-0. 安装docker-compose: 
+安装过程中会提示输入：
+- ApiHost（面板 API 地址）
+- ApiKey（面板 API 密钥）
+- NodeID（节点 ID）
+
+### 方式二：命令行参数安装（推荐自动化部署）
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/install.sh) \
+  --apiHost=https://api.example.com \
+  --apiKey=your_api_key_here \
+  --nodeID=1
 ```
-curl -fsSL https://get.docker.com | bash -s docker
-curl -L "https://github.com/docker/compose/releases/download/1.26.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+
+### 方式三：指定版本安装
+
+```bash
+# 安装指定版本
+bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/install.sh) \
+  v0.9.1 \
+  --apiHost=https://api.example.com \
+  --apiKey=your_api_key_here \
+  --nodeID=1
 ```
-1. `git clone https://github.com/XrayR-project/XrayR-release`
-2. `cd XrayR-release`
-3. 编辑config。
+
+## 参数说明
+
+| 参数 | 必填 | 说明 | 示例 |
+|------|------|------|------|
+| `--apiHost` | 是 | 面板 API 地址 | `--apiHost=https://panel.example.com` |
+| `--apiKey` | 是 | 面板 API 密钥 | `--apiKey=abc123xyz` |
+| `--nodeID` | 是 | 节点 ID | `--nodeID=1` |
+| `<version>` | 否 | XrayR 版本号 | `v0.9.1` |
+
+## 管理命令
+
+安装完成后，可使用以下命令管理 XrayR：
+
+```bash
+XrayR start      # 启动服务
+XrayR stop       # 停止服务
+XrayR restart    # 重启服务
+XrayR status     # 查看状态
+XrayR log        # 查看日志
+XrayR enable     # 开机自启
+XrayR disable    # 取消自启
+XrayR update     # 更新版本
+XrayR uninstall  # 卸载服务
+```
+
+# 项目文件说明
+
+- `install.sh` - 一键安装脚本
+- `XrayR.sh` - 服务管理脚本
+- `config.yml` - 配置文件模板
+- `XrayR.service` - Systemd 服务配置文件（Ubuntu/Debian/CentOS）
+- `xrayr.initd` - OpenRC 服务配置文件（Alpine Linux）
+
+# 配置说明
 配置文件基本格式如下，Nodes下可以同时添加多个面板，多个节点配置信息，只需添加相同格式的Nodes item即可。
-4. 启动docker：`docker-compose up -d`
 ```
 Log:
-  Level: none # Log level: none, error, warning, info, debug 
-  AccessPath: # /etc/XrayR/access.Log
-  ErrorPath: # /etc/XrayR/error.log
-DnsConfigPath: # /etc/XrayR/dns.json Path to dns config
-ConnetionConfig:
-  Handshake: 4 # Handshake time limit, Second
-  ConnIdle: 10 # Connection idle time limit, Second
-  UplinkOnly: 2 # Time limit when the connection downstream is closed, Second
-  DownlinkOnly: 4 # Time limit when the connection is closed after the uplink is closed, Second
-  BufferSize: 64 # The internal cache size of each connection, kB 
+  Level: debug                    # 日志级别: none, error, warning, info, debug
+  AccessPath:                     # 访问日志路径: /etc/XrayR/access.log
+  ErrorPath:                      # 错误日志路径: /etc/XrayR/error.log
+DnsConfigPath:                    # DNS 配置文件路径: /etc/XrayR/dns.json，参考 https://xtls.github.io/config/dns.html
+RouteConfigPath:                  # 路由配置文件路径: /etc/XrayR/route.json，参考 https://xtls.github.io/config/routing.html
+InboundConfigPath:                # 自定义入站配置路径: /etc/XrayR/custom_inbound.json，参考 https://xtls.github.io/config/inbound.html
+OutboundConfigPath:               # 自定义出站配置路径: /etc/XrayR/custom_outbound.json，参考 https://xtls.github.io/config/outbound.html
+ConnectionConfig:
+  Handshake: 4                    # 握手时间限制，单位：秒
+  ConnIdle: 30                    # 连接空闲时间限制，单位：秒
+  UplinkOnly: 2                   # 下行关闭后的时间限制，单位：秒
+  DownlinkOnly: 4                 # 上行关闭后的时间限制，单位：秒
+  BufferSize: 64                  # 每个连接的内部缓存大小，单位：kB
 Nodes:
   -
-    PanelType: "SSpanel" # Panel type: SSpanel, V2board, PMpanel
+    PanelType: "NewV2board"       # 面板类型: SSpanel, V2board, NewV2board, PMpanel, Proxypanel, V2RaySocks
     ApiConfig:
       ApiHost: "http://127.0.0.1:667"
       ApiKey: "123"
       NodeID: 41
-      NodeType: V2ray # Node type: V2ray, Shadowsocks, Trojan
-      Timeout: 30 # Timeout for the api request
-      EnableVless: false # Enable Vless for V2ray Type
-      EnableXTLS: false # Enable XTLS for V2ray and Trojan
-      SpeedLimit: 0 # Mbps, Local settings will replace remote settings, 0 means disable
-      DeviceLimit: 0 # Local settings will replace remote settings, 0 means disable
-      RuleListPath: # /etc/XrayR/rulelist Path to local rulelist file
+      NodeType: Shadowsocks       # 节点类型: V2ray, Vmess, Vless, Shadowsocks, Trojan, Shadowsocks-Plugin
+      Timeout: 30                 # API 请求超时时间，单位：秒
+      EnableVless: false          # 为 V2ray 类型启用 Vless
+      EnableXTLS: false           # 为 V2ray 和 Trojan 启用 XTLS
+      SpeedLimit: 0               # 本地限速设置，单位：Mbps，0 表示禁用
+      DeviceLimit: 0              # 本地设备数限制，0 表示禁用
+      RuleListPath:               # 本地规则列表文件路径: /etc/XrayR/rulelist
     ControllerConfig:
-      ListenIP: 0.0.0.0 # IP address you want to listen
-      SendIP: 0.0.0.0 # IP address you want to send pacakage
-      UpdatePeriodic: 60 # Time to update the nodeinfo, how many sec.
-      EnableDNS: false # Use custom DNS config, Please ensure that you set the dns.json well
-      DNSType: AsIs # AsIs, UseIP, UseIPv4, UseIPv6, DNS strategy
-      EnableProxyProtocol: false # Only works for WebSocket and TCP
-      EnableFallback: false # Only support for Trojan and Vless
-      FallBackConfigs:  # Support multiple fallbacks
+      ListenIP: 0.0.0.0           # 监听的 IP 地址
+      SendIP: 0.0.0.0             # 发送数据包的 IP 地址
+      UpdatePeriodic: 60          # 更新节点信息的时间间隔，单位：秒
+      EnableDNS: false            # 使用自定义 DNS 配置，请确保正确设置 dns.json
+      DNSType: AsIs               # DNS 策略: AsIs, UseIP, UseIPv4, UseIPv6
+      EnableProxyProtocol: false  # 启用 PROXY 协议，仅适用于 WebSocket 和 TCP
+      AutoSpeedLimitConfig:
+        Limit: 0                  # 警告速度，单位：mbps，设置为 0 禁用自动限速
+        WarnTimes: 0              # 连续警告次数后限速，设置为 0 立即惩罚超速用户
+        LimitSpeed: 0             # 限速用户的速度限制，单位：mbps
+        LimitDuration: 0          # 限速持续时间，单位：分钟
+      GlobalDeviceLimitConfig:
+        Enable: false             # 启用全局设备数限制
+        RedisAddr: 127.0.0.1:6379 # Redis 服务器地址
+        RedisPassword: YOUR PASSWORD # Redis 密码
+        RedisDB: 0                # Redis 数据库编号
+        Timeout: 5                # Redis 请求超时时间，单位：秒
+        Expiry: 60                # 过期时间，单位：秒
+      EnableFallback: false       # 启用回落功能，仅支持 Trojan 和 Vless
+      FallBackConfigs:            # 支持多个回落配置
         -
-          SNI: # TLS SNI(Server Name Indication), Empty for any
-          Path: # HTTP PATH, Empty for any
-          Dest: 80 # Required, Destination of fallback, check https://xtls.github.io/config/fallback/ for details.
-          ProxyProtocolVer: 0 # Send PROXY protocol version, 0 for dsable
+          SNI:                    # TLS SNI（服务器名称指示），留空表示任意
+          Alpn:                   # Alpn 协议，留空表示任意
+          Path:                   # HTTP 路径，留空表示任意
+          Dest: 80                # 必填，回落目标地址，详见 https://xtls.github.io/config/features/fallback.html
+          ProxyProtocolVer: 0     # 发送 PROXY 协议版本，0 表示禁用
       CertConfig:
-        CertMode: dns # Option about how to get certificate: none, file, http, dns. Choose "none" will forcedly disable the tls config.
-        CertDomain: "node1.test.com" # Domain to cert
-        CertFile: /etc/XrayR/cert/node1.test.com.cert # Provided if the CertMode is file
-        KeyFile: /etc/XrayR/cert/node1.test.com.key
-        Provider: alidns # DNS cert provider, Get the full support list here: https://go-acme.github.io/lego/dns/
-        Email: test@me.com
-        DNSEnv: # DNS ENV option used by DNS provider
+        CertMode: dns             # 证书获取方式: none, file, http, tls, dns。选择 "none" 将强制禁用 TLS 配置
+        CertDomain: "node1.test.com" # 证书域名
+        CertFile: /etc/XrayR/cert/node1.test.com.cert # 证书文件路径（CertMode 为 file 时提供）
+        KeyFile: /etc/XrayR/cert/node1.test.com.key   # 密钥文件路径
+        Provider: alidns          # DNS 证书提供商，完整列表见 https://go-acme.github.io/lego/dns/
+        Email: test@me.com        # 邮箱地址
+        DNSEnv:                   # DNS 提供商使用的环境变量
           ALICLOUD_ACCESS_KEY: aaa
           ALICLOUD_SECRET_KEY: bbb
-  # -
-  #   PanelType: "V2board" # Panel type: SSpanel, V2board
-  #   ApiConfig:
-  #     ApiHost: "http://127.0.0.1:668"
-  #     ApiKey: "123"
-  #     NodeID: 4
-  #     NodeType: Shadowsocks # Node type: V2ray, Shadowsocks, Trojan
-  #     Timeout: 30 # Timeout for the api request
-  #     EnableVless: false # Enable Vless for V2ray Type
-  #     EnableXTLS: false # Enable XTLS for V2ray and Trojan
-  #     SpeedLimit: 0 # Mbps, Local settings will replace remote settings
-  #     DeviceLimit: 0 # Local settings will replace remote settings
-  #   ControllerConfig:
-  #     ListenIP: 0.0.0.0 # IP address you want to listen
-  #     UpdatePeriodic: 10 # Time to update the nodeinfo, how many sec.
-  #     EnableDNS: false # Use custom DNS config, Please ensure that you set the dns.json well
-  #     CertConfig:
-  #       CertMode: dns # Option about how to get certificate: none, file, http, dns
-  #       CertDomain: "node1.test.com" # Domain to cert
-  #       CertFile: /etc/XrayR/cert/node1.test.com.cert # Provided if the CertMode is file
-  #       KeyFile: /etc/XrayR/cert/node1.test.com.pem
-  #       Provider: alidns # DNS cert provider, Get the full support list here: https://go-acme.github.io/lego/dns/
-  #       Email: test@me.com
-  #       DNSEnv: # DNS ENV option used by DNS provider
-  #         ALICLOUD_ACCESS_KEY: aaa
-  #         ALICLOUD_SECRET_KEY: bbb
-```
-
-## Docker compose升级
-在docker-compose.yml目录下执行：
-```
-docker-compose pull
-docker-compose up -d
 ```

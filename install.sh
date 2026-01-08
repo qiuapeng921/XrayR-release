@@ -10,23 +10,66 @@ cur_dir=$(pwd)
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误：${plain} 必须使用root用户运行此脚本！\n" && exit 1
 
+# 解析命令行参数
+API_HOST=""
+API_KEY=""
+NODE_ID=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --apiHost=*)
+            API_HOST="${1#*=}"
+            shift
+            ;;
+        --apiKey=*)
+            API_KEY="${1#*=}"
+            shift
+            ;;
+        --nodeID=*)
+            NODE_ID="${1#*=}"
+            shift
+            ;;
+        *)
+            # 如果是版本号参数，保留给后面使用
+            if [[ ! $1 =~ ^-- ]]; then
+                VERSION_ARG="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
 # check os
-if [[ -f /etc/redhat-release ]]; then
+if [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+    release=$ID
+    case $ID in
+        debian|ubuntu|centos|rhel|fedora|rocky|alma)
+            release=$ID
+            ;;
+        alpine)
+            release="alpine"
+            ;;
+        *)
+            release="unknown"
+            ;;
+    esac
+elif [[ -f /etc/redhat-release ]]; then
     release="centos"
-elif cat /etc/issue | grep -Eqi "debian"; then
+elif cat /etc/issue 2>/dev/null | grep -Eqi "debian"; then
     release="debian"
-elif cat /etc/issue | grep -Eqi "ubuntu"; then
+elif cat /etc/issue 2>/dev/null | grep -Eqi "ubuntu"; then
     release="ubuntu"
-elif cat /etc/issue | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "debian"; then
+elif cat /etc/issue 2>/dev/null | grep -Eqi "alpine"; then
+    release="alpine"
+elif cat /proc/version 2>/dev/null | grep -Eqi "debian"; then
     release="debian"
-elif cat /proc/version | grep -Eqi "ubuntu"; then
+elif cat /proc/version 2>/dev/null | grep -Eqi "ubuntu"; then
     release="ubuntu"
-elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
 else
-    echo -e "${red}未检测到系统版本，请联系脚本作者！${plain}\n" && exit 1
+    echo -e "${red}未检测到系统版本！${plain}\n"
+    echo -e "${yellow}支持的系统: Ubuntu, Debian, CentOS, Alpine Linux${plain}\n"
+    exit 1
 fi
 
 arch=$(arch)
@@ -59,7 +102,7 @@ if [[ -z "$os_version" && -f /etc/lsb-release ]]; then
     os_version=$(awk -F'[= ."]+' '/DISTRIB_RELEASE/{print $2}' /etc/lsb-release)
 fi
 
-if [[ x"${release}" == x"centos" ]]; then
+if [[ x"${release}" == x"centos" ]] || [[ x"${release}" == x"rhel" ]] || [[ x"${release}" == x"fedora" ]] || [[ x"${release}" == x"rocky" ]] || [[ x"${release}" == x"alma" ]]; then
     if [[ ${os_version} -le 6 ]]; then
         echo -e "${red}请使用 CentOS 7 或更高版本的系统！${plain}\n" && exit 1
     fi
@@ -71,12 +114,20 @@ elif [[ x"${release}" == x"debian" ]]; then
     if [[ ${os_version} -lt 8 ]]; then
         echo -e "${red}请使用 Debian 8 或更高版本的系统！${plain}\n" && exit 1
     fi
+elif [[ x"${release}" == x"alpine" ]]; then
+    if [[ ${os_version} -lt 3 ]]; then
+        echo -e "${red}请使用 Alpine Linux 3.0 或更高版本的系统！${plain}\n" && exit 1
+    fi
 fi
 
 install_base() {
-    if [[ x"${release}" == x"centos" ]]; then
+    if [[ x"${release}" == x"centos" ]] || [[ x"${release}" == x"rhel" ]] || [[ x"${release}" == x"fedora" ]] || [[ x"${release}" == x"rocky" ]] || [[ x"${release}" == x"alma" ]]; then
         yum install epel-release -y
         yum install wget curl unzip tar crontabs socat -y
+    elif [[ x"${release}" == x"alpine" ]]; then
+        apk update
+        apk add --no-cache wget curl unzip tar socat ca-certificates tzdata
+        apk add --no-cache openrc
     else
         apt update -y
         apt install wget curl unzip tar cron socat -y
@@ -85,14 +136,25 @@ install_base() {
 
 # 0: running, 1: not running, 2: not installed
 check_status() {
-    if [[ ! -f /etc/systemd/system/XrayR.service ]]; then
-        return 2
-    fi
-    temp=$(systemctl status XrayR | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
-    if [[ x"${temp}" == x"running" ]]; then
-        return 0
+    if [[ x"${release}" == x"alpine" ]]; then
+        if [[ ! -f /etc/init.d/xrayr ]]; then
+            return 2
+        fi
+        if rc-service xrayr status 2>/dev/null | grep -q "started"; then
+            return 0
+        else
+            return 1
+        fi
     else
-        return 1
+        if [[ ! -f /etc/systemd/system/XrayR.service ]]; then
+            return 2
+        fi
+        temp=$(systemctl status XrayR | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+        if [[ x"${temp}" == x"running" ]]; then
+            return 0
+        else
+            return 1
+        fi
     fi
 }
 
@@ -139,23 +201,102 @@ install_XrayR() {
     rm XrayR-linux.zip -f
     chmod +x XrayR
     mkdir /etc/XrayR/ -p
-    rm /etc/systemd/system/XrayR.service -f
-    file="https://github.com/XrayR-project/XrayR-release/raw/master/XrayR.service"
-    wget -q -N --no-check-certificate -O /etc/systemd/system/XrayR.service ${file}
-    #cp -f XrayR.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl stop XrayR
-    systemctl enable XrayR
-    echo -e "${green}XrayR ${last_version}${plain} 安装完成，已设置开机自启"
+    
+    # 配置服务
+    if [[ x"${release}" == x"alpine" ]]; then
+        # 为 Alpine 配置 OpenRC 服务
+        if [[ -f xrayr.initd ]]; then
+            cp xrayr.initd /etc/init.d/xrayr
+            chmod +x /etc/init.d/xrayr
+        else
+            file="https://github.com/qiuapeng921/XrayR-release/raw/master/xrayr.initd"
+            wget -q -N --no-check-certificate -O /etc/init.d/xrayr ${file}
+            chmod +x /etc/init.d/xrayr
+        fi
+        rc-update add xrayr default
+        rc-service xrayr stop 2>/dev/null
+        echo -e "${green}XrayR ${last_version}${plain} 安装完成，已设置开机自启"
+    else
+        rm /etc/systemd/system/XrayR.service -f
+        file="https://github.com/qiuapeng921/XrayR-release/raw/master/XrayR.service"
+        wget -q -N --no-check-certificate -O /etc/systemd/system/XrayR.service ${file}
+        systemctl daemon-reload
+        systemctl stop XrayR
+        systemctl enable XrayR
+        echo -e "${green}XrayR ${last_version}${plain} 安装完成，已设置开机自启"
+    fi
     cp geoip.dat /etc/XrayR/
-    cp geosite.dat /etc/XrayR/ 
+    cp geosite.dat /etc/XrayR/
+    rm config.yml -f
 
     if [[ ! -f /etc/XrayR/config.yml ]]; then
-        cp config.yml /etc/XrayR/
+        # 从 GitHub 下载配置文件模板
+        echo -e "${yellow}正在下载配置文件模板...${plain}"
+        wget -q -N --no-check-certificate -O /etc/XrayR/config.yml https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/config.yml
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}下载配置文件失败，请检查网络连接${plain}"
+            exit 1
+        fi
         echo -e ""
-        echo -e "全新安装，请先参看教程：https://github.com/XrayR-project/XrayR，配置必要的内容"
+        echo -e "${green}开始配置 XrayR${plain}"
+        
+        # 如果命令行参数存在，使用命令行参数；否则交互式输入
+        if [[ -n "$API_HOST" ]] && [[ -n "$API_KEY" ]] && [[ -n "$NODE_ID" ]]; then
+            # 使用命令行参数
+            api_host="$API_HOST"
+            api_key="$API_KEY"
+            node_id="$NODE_ID"
+            echo -e "${green}使用命令行参数配置${plain}"
+        else
+            # 交互式输入
+            echo -e "请输入面板信息（直接回车使用默认值）："
+            echo -e ""
+            
+            # 读取 ApiHost
+            if [[ -z "$API_HOST" ]]; then
+                read -p "请输入 ApiHost (默认: http://127.0.0.1:667): " api_host
+                api_host=${api_host:-http://127.0.0.1:667}
+            else
+                api_host="$API_HOST"
+            fi
+            
+            # 读取 ApiKey
+            if [[ -z "$API_KEY" ]]; then
+                read -p "请输入 ApiKey (默认: 123): " api_key
+                api_key=${api_key:-123}
+            else
+                api_key="$API_KEY"
+            fi
+            
+            # 读取 NodeID
+            if [[ -z "$NODE_ID" ]]; then
+                read -p "请输入 NodeID (默认: 41): " node_id
+                node_id=${node_id:-41}
+            else
+                node_id="$NODE_ID"
+            fi
+        fi
+        
+        # 使用兼容的方式修改配置文件，替换占位符
+        config_file="/etc/XrayR/config.yml"
+        sed "s|\${APIHOST}|${api_host}|g" ${config_file} > ${config_file}.tmp && mv ${config_file}.tmp ${config_file}
+        sed "s|\${APIKEY}|${api_key}|g" ${config_file} > ${config_file}.tmp && mv ${config_file}.tmp ${config_file}
+        sed "s|\${NODEID}|${node_id}|g" ${config_file} > ${config_file}.tmp && mv ${config_file}.tmp ${config_file}
+        
+        echo -e ""
+        echo -e "${green}配置已更新：${plain}"
+        echo -e "  ApiHost: ${api_host}"
+        echo -e "  ApiKey: ${api_key}"
+        echo -e "  NodeID: ${node_id}"
+        echo -e ""
+        echo -e "更多配置请编辑: ${yellow}/etc/XrayR/config.yml${plain}"
+        echo -e "详细教程: https://github.com/XrayR-project/XrayR"
     else
-        systemctl start XrayR
+        if [[ x"${release}" == x"alpine" ]]; then
+            rc-service xrayr start
+        else
+            systemctl start XrayR
+        fi
         sleep 2
         check_status
         echo -e ""
@@ -181,7 +322,7 @@ install_XrayR() {
     if [[ ! -f /etc/XrayR/rulelist ]]; then
         cp rulelist /etc/XrayR/
     fi
-    curl -o /usr/bin/XrayR -Ls https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/XrayR.sh
+    curl -o /usr/bin/XrayR -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/XrayR.sh
     chmod +x /usr/bin/XrayR
     ln -s /usr/bin/XrayR /usr/bin/xrayr # 小写兼容
     chmod +x /usr/bin/xrayr
@@ -210,4 +351,4 @@ install_XrayR() {
 echo -e "${green}开始安装${plain}"
 install_base
 # install_acme
-install_XrayR $1
+install_XrayR $VERSION_ARG
