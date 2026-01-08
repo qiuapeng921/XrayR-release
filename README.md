@@ -102,11 +102,11 @@ ConnectionConfig:
   BufferSize: 64                  # 每个连接的内部缓存大小，单位：kB
 Nodes:
   -
-    PanelType: "NewV2board"       # 面板类型: SSpanel, V2board, NewV2board, PMpanel, Proxypanel, V2RaySocks
+    PanelType: NewV2board         # 面板类型: SSpanel, V2board, NewV2board, PMpanel, Proxypanel, V2RaySocks
     ApiConfig:
-      ApiHost: "http://127.0.0.1:667"
-      ApiKey: "123"
-      NodeID: 41
+      ApiHost: ${APIHOST}
+      ApiKey: ${APIKEY}
+      NodeID: ${NODEID}
       NodeType: Shadowsocks       # 节点类型: V2ray, Vmess, Vless, Shadowsocks, Trojan, Shadowsocks-Plugin
       Timeout: 30                 # API 请求超时时间，单位：秒
       EnableVless: false          # 为 V2ray 类型启用 Vless
