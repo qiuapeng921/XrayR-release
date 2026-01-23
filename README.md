@@ -22,7 +22,7 @@
 ### 方式一：交互式安装（推荐新手）
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/code-gopher/XrayR-release/master/install.sh)
 ```
 
 安装过程中会提示输入：
@@ -33,7 +33,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/mast
 ### 方式二：命令行参数安装（推荐自动化部署）
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/install.sh) \
+bash <(curl -Ls https://raw.githubusercontent.com/code-gopher/XrayR-release/master/install.sh) \
   --apiHost=https://api.example.com \
   --apiKey=your_api_key_here \
   --nodeID=1
@@ -43,7 +43,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/mast
 
 ```bash
 # 安装指定版本
-bash <(curl -Ls https://raw.githubusercontent.com/qiuapeng921/XrayR-release/master/install.sh) \
+bash <(curl -Ls https://raw.githubusercontent.com/code-gopher/XrayR-release/master/install.sh) \
   v0.9.1 \
   --apiHost=https://api.example.com \
   --apiKey=your_api_key_here \
